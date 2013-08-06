@@ -29,7 +29,7 @@ if __name__ == "__main__":
         dest="action", help='actions'
     )
     run_parser = subparsers.add_parser(
-        'run', help='run application locally'
+        'run', help='run indexer'
     )
     run_parser.add_argument(
         '-t', '--threads', dest='threads', action='store', type=int,
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     )
     query_parser.add_argument(
         '-l', '--limit', dest='limit', action='store', type=int,
-        help='how many words to print'
+        help='how many words to print', default=10
     )
     drop_parser = subparsers.add_parser(
         'drop', help='drop indexer database'
