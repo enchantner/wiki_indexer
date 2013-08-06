@@ -1,77 +1,22 @@
 #!/usr/bin/env python3
 
+import json
 import queue
-import itertools
-import threading
 import argparse
-from urllib.parse import urljoin
 
-from grab import Grab
-from pymongo import MongoClient
+from db import DBClient
+from crawler import WikiCrawler
+from indexer import WordIndexer
 
 
-class Crawler(threading.Thread):
-
-    def __init__(self, urls, maxtries=5, maxdepth=5):
-        super(Crawler, self).__init__()
-        self.urls = urls
-        self.stop = threading.Event()
-        self.g = Grab()
-
-        self.tries = 0
-        self.depth = 0
-        self.maxtries = maxtries
-        self.maxdepth = maxdepth
-
-        self.baseurl = "http://en.wikipedia.org/"
-        self.db = MongoClient('localhost', 27017)
-        self.wiki = self.db.wiki
-
-    def update_links(self, page):
-        if not self.depth >= self.maxdepth:
-            links = (
-                l.get("href").split("#")[0]
-                for l in page.cssselect("a[href]")
-            )
-            self.depth += 1
-            list(map(self.add_url, links))
-
-    def add_url(self, href):
-        url = urljoin(self.baseurl, href)
-        exist = self.wiki.parsed.find_one({"url": url})
-        if not exist and href.startswith("/wiki"):
-            self.urls.put(url)
-
-    def save(self, url, page):
-        entry = {
-            "url": url,
-            "content": page.cssselect("#mw-content-text")[0].text_content()
-        }
-        self.wiki.parsed.insert(entry)
-
-    def run(self):
-        while True:
-            try:
-                url = self.urls.get(timeout=5)
-                print(url)
-            except queue.Empty:
-                self.tries += 1
-                if self.tries > self.maxtries:
-                    print("Nothing to do here, exiting...")
-                    break
-
-            resp = self.g.go(url)
-            self.save(url, self.g.tree)
-            self.update_links(self.g.tree)
-
-def main():
+def run(threads=5):
     urls = queue.Queue()
 
     with open("start.txt", "r") as startlist:
         for url in startlist:
             urls.put(url)
 
-    pool = [Crawler(urls) for _ in range(5)]
+    pool = [WikiCrawler(urls) for _ in range(threads)]
     list(map(
         lambda t: t.start(),
         pool
@@ -79,4 +24,37 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(
+        dest="action", help='actions'
+    )
+    run_parser = subparsers.add_parser(
+        'run', help='run application locally'
+    )
+    run_parser.add_argument(
+        '-t', '--threads', dest='threads', action='store', type=int,
+        help='number of threads to start', default=5
+    )
+    query_parser = subparsers.add_parser(
+        'query', help='make a query to indexer'
+    )
+    query_parser.add_argument(
+        '-l', '--limit', dest='limit', action='store', type=int,
+        help='how many words to print'
+    )
+    drop_parser = subparsers.add_parser(
+        'drop', help='drop indexer database'
+    )
+
+    params, other_params = parser.parse_known_args()
+    if params.action == "query":
+        indexer = WordIndexer()
+        result = indexer.query(limit=params.limit)
+        print(json.dumps(result, indent=4))
+    elif params.action == "run":
+        run(threads=params.threads)
+    elif params.action == "drop":
+        client = DBClient()
+        client.drop_database(client.db_name)
+    else:
+        parser.print_help()
