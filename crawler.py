@@ -29,26 +29,32 @@ class WikiCrawler(threading.Thread):
         self.db = getattr(c, c.db_name)
 
         self.re_word = re.compile(r'\b\S+\b', re.U)
-        self.exclude_words = [
-            "the",
-            "a",
-            "an",
-            "as",
-            "or",
-            "for",
-            "of",
-            "is",
-            "be",
-            "was",
-            "are",
-            "in",
-            "to",
-            "and",
-            "not",
-            "he",
-            "she",
-            "it"
-        ]
+        self.exclude_words = []
+        #     "the",
+        #     "a",
+        #     "an",
+        #     "as",
+        #     "by",
+        #     "with",
+        #     "on",
+        #     "or",
+        #     "for",
+        #     "of",
+        #     "is",
+        #     "be",
+        #     "was",
+        #     "are",
+        #     "in",
+        #     "to",
+        #     "and",
+        #     "not",
+        #     "he",
+        #     "she",
+        #     "his",
+        #     "her",
+        #     "it",
+        #     "that"
+        # ]
 
     def update_urls(self, page):
         if not self.depth >= self.maxdepth:
@@ -62,7 +68,7 @@ class WikiCrawler(threading.Thread):
     def add_url(self, href):
         url = urljoin(self.baseurl, href)
         exist = self.db.urls.find_one({"url": url})
-        if not exist and href.startswith("/wiki"):
+        if not exist and href.startswith("/wiki") and not ":" in href:
             self.urls.put(url)
 
     def iter_words(self, page):

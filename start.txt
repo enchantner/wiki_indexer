@@ -1,1 +1,1 @@
-https://en.wikipedia.org/wiki/Python
+http://en.wikipedia.org/wiki/Python
